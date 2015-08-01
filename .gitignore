@@ -58,3 +58,4 @@ target/
 
 # MacOSX
 .DS_store
+*.swp
