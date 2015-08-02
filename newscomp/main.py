@@ -107,15 +107,26 @@ def word_concordance(word, text):
 
     """
 
+    # Initialize variable
     concordance = io.StringIO()
 
+    # Get all string with word as substring 
     words = set([w for w in zeit_text.tokens if re.findall("\\b\\w*"+word+"\\w*\\b",w)])
 
+    # Get all concordances
     with redirect_stdout(concordance):
         for w in words:
             text.concordance(w)
 
-    return concordance.getvalue()
+    # Save and close the IO object
+    result = concordance.getvalue()
+    concordance.close()
+
+    # Remove headers from nltk concordance output
+    result = re.sub("Displaying.*matches:","",result)
+    result = re.sub("\\n\\n","\\n",result)
+
+    return result
 
 # Plotting
 
