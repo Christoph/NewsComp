@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 
 from bs4 import BeautifulSoup as bs
 from urllib import request
@@ -5,34 +6,58 @@ import lxml
 import re
 import numpy as np
 import nltk as nlp
+import os
 
-class FetchArticle():
+class FetchArticles():
 
     """Fetches and normalizes an url or a list of urls"""
+    __pattern = "\\n|<.*>|\\xa0|\\r"
+
+    def __normalize_text(self, text):
+        """Normlizes the the article
+
+        :article: Article dict
+        :returns: The normalized text
+
+        """
+        # Normalize text
+
+        # Problem with stemming and special german chars
+        text = re.sub("ß","ss",text)
+        text = re.sub("ö","oe",text)
+        text = re.sub("ä","ae",text)
+        text = re.sub("ü","ue",text)
+        # Finds and deletes all urls in the text
+        text = re.sub("(http|ftp|https):\/\/([\w\-_]+(?:(?:\.[\w\-_]+)+))([\w\-\.,@?^=%&amp;:/~\+#]*[\w\-\@?^=%&amp;/~\+#])?","",text)
+
+        return text
+
 
     # Different Wrappers
     # Krone Zeitung
-    def get_krone_article(self, url, pattern):
+    def __get_krone_article(self, url):
         html = request.urlopen(url).read()
 
         # Get html as object
         soup = bs(html, "lxml", from_encoding="ISO-8859-1")
 
         # Article title
-        title = re.sub(pattern,"",soup.title.get_text())
+        title = re.sub(self.__pattern,"",soup.title.get_text())
 
         # Article excerpt
-        excerpt = re.sub(pattern, "", soup.find("div","content_lead").get_text())
+        excerpt = re.sub(self.__pattern, "", soup.find("div","content_lead").get_text())
 
         # Article text
-        content = re.sub(pattern, "", soup.find("div","content_text").get_text())
+        content = re.sub(self.__pattern, "", soup.find("div","content_text").get_text())
+
+        content = self.__normalize_text(content)
         
         return {"title":title, "excerpt":excerpt, "content":content}
 
 
 
     # Zeit Online 
-    def get_zeit_article(self, url, pattern,  pages = 1):
+    def __get_zeit_article(self, url, pages = 1):
 
         # Text parser
         def has_no_class(tag):
@@ -64,59 +89,64 @@ class FetchArticle():
                 content_sets.extend([tag.find_all(has_no_class) for tag in soup.find_all("div",{"class":"article-body"}) ])
 
         # Normalize
-        title = re.sub(pattern, " ",title)
-        excerpt = re.sub(pattern, " ",excerpt)
+        title = re.sub(self.__pattern, " ",title)
+        excerpt = re.sub(self.__pattern, " ",excerpt)
 
         temp = [" ".join([t.get_text() for t in rs]) for rs in content_sets]
         content = " ".join(temp)
-        content = re.sub(pattern," ",content)
+        content = re.sub(self.__pattern," ",content)
+
+        content = self.__normalize_text(content)
 
         return {"title":title, "excerpt":excerpt, "content":content}
 
 
-    def normalize_article(self, article):
-        """Normlizes the the article
+  
+    def download_all_articles(self):
+        """Saves all articles as txt files under data/
 
-        :article: Article dict
-        :returns: The normalized text and the frequency distribution object
-
-        """
-        # Normalize text
-        # Convert normal text to nltk.Text
-        tokens = nlp.word_tokenize(article["content"])
-        text = nlp.Text(tokens)
-
-        # Frequency distribution
-        return text
-
-    def get_article(self, url, news):
-        """Returns normalized article text
-
-        :url: Article url or list of article urls
-        :news: Which newspaper as string
-        :returns: raw text 
-
+        :urls: filename of a txt file containing article urls located in project root
         """
 
-        # Initialize variables
-        # Remove newline and hyperlinks and join text objects and non breaking spaces
-        pattern = "\\n|<.*>|\\xa0|\\r"
+        # Create corpus directory
+        corpusdir = 'data/'
+        if not os.path.isdir(corpusdir):
+            os.mkdir(corpusdir)       
 
-        # Get articles
-        if news == "zeit":
-            article = self.get_zeit_article(url, pattern)
-        elif news == "krone":
-            article = self.get_krone_article(url, pattern)
+        zeitdir = 'data/zeit/'
+        if not os.path.isdir(zeitdir):
+            os.mkdir(zeitdir)       
 
-        return self.normalize_article(article)
+        kronedir = 'data/krone/'
+        if not os.path.isdir(kronedir):
+            os.mkdir(kronedir)       
 
+        # Save articles
+        # Zeit
+        with open("zeit.txt", "r") as url_list:
+            for line in url_list.readlines():
+                article = self.__get_zeit_article(line)
 
+                # Format title
+                title = re.sub("...ZEIT ONLINE ","",article["title"].strip())
+                title = re.sub("\\W","_",title)
+                title = re.sub("_+","_",title)
 
+                with open(zeitdir+title+".txt", "w") as text_file:
+                    text_file.write(article["content"])
 
+        # Krone
+        with open("krone.txt", "r") as url_list:
+            for line in url_list.readlines():
+                article = self.__get_krone_article(line)
 
+                # Format title
+                title = re.sub("-.*-.*- krone.at","",article["title"].strip())
+                title = re.sub("\\W","_",title)
+                title = re.sub("_+","_",title)
 
-
-
+                with open(kronedir+title+".txt", "w") as text_file:
+                    text_file.write(article["content"])
 
 
 
