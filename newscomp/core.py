@@ -6,6 +6,10 @@ import re
 import nltk as nlp
 from nltk.corpus import CategorizedPlaintextCorpusReader
 
+# Data analysis
+import numpy as np
+import pandas as pd
+
 # For the concordance output
 import io
 from contextlib import redirect_stdout
@@ -15,14 +19,7 @@ class NewsComparator():
 
     """Gives statistical information for a given article"""
 
-    def __init__(self):
-        self.total_word_count = {}
-        self.total_vocab_count = {}
-        self.norm_word_count = {}
-        self.norm_vocab_count = {}
-        self.norm_vocab = {}
-        self.lexical_diversity = {}
-
+    __metrics = ["TotalWordCount","TotalVocabCount","NormalizedWordCount","NormalizedVocabCount","LexicalDiversity"]
 
     def initialize(self, language, chars):
         """Initializes the news comparator class
@@ -31,8 +28,8 @@ class NewsComparator():
         :chars: Chars which will be removed before any statistical analysis
 
         """
-        self.news_corp, self.norm_words = self.__create_corpus(language,chars)
-        self.__basic_statistics(chars)
+        self.corp, self.words = self.__create_corpus(language,chars)
+        self.metrics = self.__basic_statistics(chars)
 
     def __basic_statistics(self, chars):
         """Computes basic metrics and statistics for a given text
@@ -40,37 +37,38 @@ class NewsComparator():
         """
 
         # Get all newspapers
-        cat = self.news_corp.categories()
+        cat = self.corp.categories()
+
+        # Creating dataframe and adding new columns
+        metrics = pd.DataFrame(index=cat)
 
         # Compute basic statistics foreach paper separatly
         for news in cat:
             # Simple statistics
-            fd = nlp.FreqDist(self.norm_words[news])
+            fd = nlp.FreqDist(self.words[news])
 
             # Basic measures
             # On the normalized text
-            self.norm_word_count.update({news:fd.N()})
-            self.norm_vocab_count.update({news: fd.B()})
-
-            # Vocabulary
-            self.norm_vocab.update({news:fd.keys()})
+            metrics.loc[news,"NormalizedWordCount"] = fd.N()
+            metrics.loc[news,"NormalizedVocabCount"] = fd.B()
 
             # On the original text
-            words = self.news_corp.words(categories=news)
+            words = self.corp.words(categories=news)
             words = [w.encode("utf-8").lower() for w in words if w not in chars]
 
             vocab = set(words)
 
-            self.total_word_count.update({news: len(words)})
-            self.total_vocab_count.update({news: len(vocab)})
-            self.lexical_diversity.update({news: len(words)/len(vocab)}) 
+            metrics.loc[news,"TotalWordCount"] = len(words)
+            metrics.loc[news,"TotalVocabCount"] = len(vocab)
+            metrics.loc[news,"LexicalDiversity"] = len(words)/len(vocab)
 
+        return metrics
 
         # Word length
         #wl = nlp.FreqDist([len(w) for w in tw])
 
         # Access words of the second corpus
-        # news_corpus.words(news_corpus.fileids()[1])
+        # corpus.words(corpus.fileids()[1])
 
     def compare_word_freq(self):
         """Computes and plots the cond freq dist for all categories
@@ -82,8 +80,8 @@ class NewsComparator():
 
         cfd = nlp.ConditionalFreqDist(
                 (news, word)
-                for news in self.news_corp.categories()
-                for word in self.norm_words[news]
+                for news in self.corp.categories()
+                for word in self.words[news]
                 )
         #Plot CDF
         cfd.plot(samples=common_vocab)
@@ -102,10 +100,10 @@ class NewsComparator():
         result = {}
 
         if not(perArticle):
-            cat = self.news_corp.categories()
+            cat = self.corp.categories()
 
             for news in cat:
-                fd = nlp.FreqDist(self.norm_words[news])
+                fd = nlp.FreqDist(self.words[news])
 
                 words = [w for w in self.norm_vocab[news] if len(w) > length and fd[w] > frequency]
                 result.update({news: words})
@@ -146,7 +144,6 @@ class NewsComparator():
             words = [snow.stem(w) for w in words]
 
             total_words.update({news: words})
-
 
         return news_corpus, total_words
 
