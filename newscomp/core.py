@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# NLP stuff
+# NLP 
 from nltk.corpus import stopwords
 import re
 import nltk as nlp

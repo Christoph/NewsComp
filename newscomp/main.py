@@ -3,7 +3,7 @@
 # Python imports
 import importlib
 
-# NLP stuff
+# NLP 
 from nltk.corpus import stopwords
 import re
 import nltk as nlp
